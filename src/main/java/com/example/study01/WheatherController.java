@@ -1,16 +1,24 @@
 package com.example.study01;
 
 
+import com.example.study01.vo.Header;
+import org.json.JSONArray;
+import org.json.JSONObject;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import sun.jvm.hotspot.memory.HeapBlock;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.UnsupportedEncodingException;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.HashMap;
 
 @Controller
 public class WheatherController {
@@ -36,7 +44,7 @@ public class WheatherController {
         String data = "user="+paramUser+"&userId="+paramUserId;
 
         //메소드 호출 실시
-        httpGetConnection(url, data);
+        //httpGetConnection(url, data, );
 
         return "null";
     }
@@ -48,14 +56,70 @@ public class WheatherController {
                                @RequestParam(required = false) String language,
                                @RequestParam(required = false) String page,
                                @RequestParam(required = false) String count
-                               ) {
+                               ) throws UnsupportedEncodingException {
+
+        ArrayList<Header> headerList = new ArrayList<>();
+        Header header1 = new Header();
+        Header header2 = new Header();
+        String returnData = new String();
+
+        // Open Wheather Param
+        String lat = "";
+        String lon = "";
+        String appKey = "4c7abda05027dae6b10dcf6771d696a5";
+
+        if (coordinate != null && filter.length() != 0){
+            coordinate = "="+coordinate;
+        } else {
+            coordinate = "";
+        }
+        if (filter != null && filter.length() != 0){
+            filter = "="+filter;
+        } else {
+            filter = "";
+        }
+        if (language != null && language.length() != 0){
+            language = "="+language;
+        } else {
+            language = "";
+        }
+        if (page != null && page.length() != 0){
+            page = "="+page;
+        } else {
+            page = "";
+        }
+        if (count != null && count.length() != 0){
+            count = "="+count;
+        } else {
+            count = "";
+        }
 
         // 임시코드
         String url = "https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode";
-        String data = "query="+query+"&coordinate="+coordinate+"&filter="+filter+"&language"+language+"&page="+page+"&count="+count;
+        String param = "query="+URLEncoder.encode(query, "utf-8")+"&coordinate"+coordinate+"&filter"+filter+"&language"+language+"&page"+page+"&count"+count;
+        //String param = "query="+URLEncoder.encode(query, "utf-8");
+
+        header1.setKey("X-NCP-APIGW-API-KEY-ID");
+        header1.setValue("aj3rk4akaq");
+        header2.setKey("X-NCP-APIGW-API-KEY");
+        header2.setValue("f7PEQw7klCrNPgHktc1sE7y5A4JfST60GTariSHt");
+
+        headerList.add(header1);
+        headerList.add(header2);
+        
+        returnData = httpGetConnection(url, param, headerList);
+        
+        // Json 파싱
+        JSONObject jsonObject = new JSONObject(returnData);
+        JSONArray jsonAddresses = jsonObject.getJSONArray("addresses");
+
+        for(int i = 0; i < jsonAddresses.length(); i++) {
+            JSONObject obj = jsonAddresses.getJSONObject(i);
+            System.out.println(obj.getString("x"));
+            System.out.println(obj.getString("y"));
+        }
 
 
-        httpGetConnection(url, data);
 
         return "success";
     }
@@ -63,19 +127,9 @@ public class WheatherController {
     // url
     // param
     // header
-    public static void httpGetConnection(String urlData, String paramData) {
+    public static String httpGetConnection(String urlData, String paramData, ArrayList<Header> headerData) {
         //http 요청 시 url 주소와 파라미터 데이터를 결합하기 위한 변수 선언
-        String totalUrl = "";
-        if(paramData != null && paramData.length() > 0 &&
-                !paramData.equals("") && !paramData.contains("null")) { //파라미터 값이 널값이 아닌지 확인
-            totalUrl = urlData.trim().toString() + "?" + paramData.trim().toString();
-        } else {
-            totalUrl = urlData.trim().toString();
-        }
-
-        totalUrl = urlData.toString()+paramData.toString();
-
-        System.out.println("total"+totalUrl);
+        String totalUrl = urlData.trim().toString() + "?" + paramData.trim().toString();
 
         //http 통신을 하기위한 객체 선언 실시
         URL url = null;
@@ -98,17 +152,10 @@ public class WheatherController {
             conn.setRequestProperty("Accept", "application/json");
             conn.setRequestMethod("GET");
 
-            // 네이버 API 헤더 임시 추가
-            conn.setRequestProperty("X-NCP-APIGW-API-KEY-ID", "aj3rk4akaq");
-            conn.setRequestProperty("X-NCP-APIGW-API-KEY", "f7PEQw7klCrNPgHktc1sE7y5A4JfST60GTariSHt");
-
-            // request header set
-//            conn.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-//            conn.setRequestProperty("Accept-Charset", "windows-949,utf-8;q=0.7,*;q=0.3");
-//            conn.setRequestProperty("Accept-Encoding", "gzip,deflate,sdch");
-//            conn.setRequestProperty("Accept-Language", "ko-KR,ko;q=0.8,en-US;q=0.6,en;q=0.4");
-//            conn.setRequestProperty("Connection", "keep-alive");
-//            conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/535.7 (KHTML, like Gecko) Chrome/16.
+            // Header 추가
+            for(int i = 0; i < headerData.size(); i++) {
+                conn.setRequestProperty(headerData.get(i).getKey().toString(), headerData.get(i).getValue().toString());
+            }
 
             //http 요청 실시
             conn.connect();
@@ -145,7 +192,8 @@ public class WheatherController {
                 e.printStackTrace();
             }
         }
-    }
 
+        return returnData;
+    }
 }
 
